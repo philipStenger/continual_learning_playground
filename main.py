@@ -12,6 +12,8 @@ from pathlib import Path
 from src.models.simple_mlp import SimpleMLP
 from src.data.dataset_loader import get_dataset
 from src.algorithms.ewc import EWC
+from src.algorithms.replay import ExperienceReplay
+from src.algorithms.naive import NaiveLearning
 from src.utils.logging import setup_logger
 
 def main():
@@ -26,6 +28,10 @@ def main():
                        help='Number of epochs per task')
     parser.add_argument('--lr', type=float, default=0.001,
                        help='Learning rate')
+    parser.add_argument('--memory_size', type=int, default=1000,
+                       help='Memory buffer size for replay algorithm')
+    parser.add_argument('--replay_ratio', type=float, default=0.5,
+                       help='Ratio of replay samples to current task samples')
     
     args = parser.parse_args()
     
@@ -49,21 +55,38 @@ def main():
     model.to(device)
     
     # Initialize continual learning algorithm
+    device_str = str(device)
     if args.algorithm == 'ewc':
-        algorithm = EWC(model, device=device)
+        algorithm = EWC(model, device=device_str)
+    elif args.algorithm == 'replay':
+        algorithm = ExperienceReplay(model, device=device_str, memory_size=args.memory_size)
+    elif args.algorithm == 'naive':
+        algorithm = NaiveLearning(model, device=device_str)
     else:
         raise NotImplementedError(f"Algorithm {args.algorithm} not implemented yet")
     
     # Train on tasks sequentially
     for task_id, (train_loader, test_loader) in enumerate(zip(train_loaders, test_loaders)):
         logger.info(f"Training on task {task_id + 1}")
-        algorithm.train_task(train_loader, test_loader, epochs=args.epochs, lr=args.lr)
+        
+        # Pass additional arguments for replay algorithm
+        if args.algorithm == 'replay':
+            # Use ExperienceReplay specific method call
+            algorithm.train_task(train_loader, test_loader, epochs=args.epochs,  # type: ignore
+                               lr=args.lr, replay_ratio=args.replay_ratio)
+        else:
+            algorithm.train_task(train_loader, test_loader, epochs=args.epochs, lr=args.lr)
         
         # Evaluate on all previous tasks
         logger.info(f"Evaluating after task {task_id + 1}")
         for prev_task_id, prev_test_loader in enumerate(test_loaders[:task_id + 1]):
             accuracy = algorithm.evaluate(prev_test_loader)
             logger.info(f"Task {prev_task_id + 1} accuracy: {accuracy:.4f}")
+            
+        # Print memory stats for replay algorithm
+        if args.algorithm == 'replay' and hasattr(algorithm, 'get_memory_stats'):
+            memory_stats = algorithm.get_memory_stats()  # type: ignore
+            logger.info(f"Memory stats: {memory_stats}")
 
 if __name__ == "__main__":
     main()
