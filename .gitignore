@@ -83,11 +83,9 @@ ehthumbs.db
 Thumbs.db
 
 # Project-specific files
-data/
 datasets/
 logs/
 checkpoints/
-models/
 results/
 experiments/
 wandb/

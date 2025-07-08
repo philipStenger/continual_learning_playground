@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 
 from src.models.simple_mlp import SimpleMLP
-from src.data.dataset_loader import get_dataset
+from src.utils.dataset_loader import get_dataset
 from src.algorithms.ewc import EWC
 from src.algorithms.replay import ExperienceReplay
 from src.algorithms.naive import NaiveLearning
